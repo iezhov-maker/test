@@ -129,6 +129,10 @@ classdef ZakovikaClass < handle
             x = obj.radiusArray .* cos(obj.fiArray) / 1000; % в км
             y = obj.radiusArray .* sin(obj.fiArray) / 1000; % в км
             
+            hold on
+            %Рисование Земли
+            viscircles([0,0],obj.earthR/1000);
+            
             % Построение траектории
             plot(x, y, 'b-', 'LineWidth', 2, 'DisplayName', 'Траектория спутника');
             hold on;
@@ -150,6 +154,7 @@ classdef ZakovikaClass < handle
             % Установка пределов осей для лучшей видимости
             maxRadius = max(obj.radiusArray) / 1000;
             axis([-maxRadius*1.1, maxRadius*1.1, -maxRadius*1.1, maxRadius*1.1]);
+            hold off
         end
 
         function result = v1Space(obj,h)
@@ -185,17 +190,19 @@ classdef ZakovikaClass < handle
           radiusNew = obj.radius + obj.tau * radiusDerivativeNew;
           fiNew = obj.fi + obj.tau * fiDerivativeNew;
           hNew = radiusNew-obj.earthR;
-          %betanew = math.atan2(Rnew-R, tau*v);
+          betanew = atan2(radiusNew-obj.radius, obj.tau*fiDerivativeNew*obj.radius);
         
           obj.h = hNew;
           obj.radius = radiusNew;
           obj.radiusDerivative = radiusDerivativeNew;
           obj.fi = fiNew;
           obj.fiDerivative = fiDerivativeNew;
-          %obj.beta = betanew;
+          velocity = obj.fiDerivative * obj.earthR;
+          obj.beta = betanew;
         
           obj.radiusArray = [obj.radiusArray obj.radius];
           obj.fiArray = [obj.fiArray (obj.fi)];
+          obj.velocityArray = [obj.velocityArray velocity];
           obj.t = obj.t + obj.tau;
           result = obj.h;
         end
