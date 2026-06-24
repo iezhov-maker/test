@@ -25,11 +25,14 @@ classdef ZakovikaClass < handle
         fiDerivative = 0; %v1_space(h)/(2*pi)
         radius
         radiusDerivative = 0;
-        beta = 2*pi/180;
+        velocity
+        beta = -2*pi/180;
         
         radiusArray = [];
         fiArray = [];
         velocityArray = [];
+        betaArray = [];
+        frArray = [];
 
     end
 
@@ -55,6 +58,7 @@ classdef ZakovikaClass < handle
             else
                 obj.fiDerivative = fiDerivative;
             end
+            obj.velocity = sqrt(obj.radiusDerivative^2+(obj.fiDerivative*obj.radius)^2);
         end
 
         function result = moreParams(obj, cx, S, m)
@@ -70,28 +74,14 @@ classdef ZakovikaClass < handle
             result = S/m;
         end
 
-        function result = iterate(obj, tau, tEnd)
-            arguments
-                obj (:, 1) {mustBeNonempty}
-                tau (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
-                tEnd (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
-            end
-            while(obj.t < tEnd)
-                hh = obj.numStep();
-                obj.t = obj.t + tau;
-                if hh<=0
-                  break;
-                end
-            end
-            result = hh;
-        end
-
         function draw(obj)
             % Построение зависимостей радиуса и угла от шага по времени
 
             arguments
                 obj (:, 1) {mustBeNonempty}
             end
+            figure('Name', 'Построение зависимостей радиуса и угла от шага по времени', 'Position', [50, 50, 350, 350]);
+            hold on
             xLine = 1:1:length(obj.radiusArray);
             subplot(1, 2, 1);
             plot(xLine,obj.radiusArray);
@@ -102,6 +92,7 @@ classdef ZakovikaClass < handle
             plot(xLine,obj.fiArray);
             xlabel('N');
             ylabel('Fi')
+            hold off
         end
 
         function plotVelocity(obj)
@@ -110,10 +101,43 @@ classdef ZakovikaClass < handle
             arguments
                 obj (:,1) {mustBeNonempty}
             end
+            figure('Name', 'График скорости', 'Position', [100, 100, 400, 400]);
+            hold on
             xLine = 1:1:length(obj.velocityArray);
             plot(xLine,obj.velocityArray);
             xlabel('N');
-            ylabel('V')
+            ylabel('V');
+            hold off
+        end
+
+        function plotBeta(obj)
+            % Построение угла наклона траектории
+
+            arguments
+                obj (:,1) {mustBeNonempty}
+            end
+            figure('Name', 'График угла наклона траектории', 'Position', [100, 100, 400, 400]);
+            hold on
+            xLine = 1:1:length(obj.betaArray);
+            plot(xLine,obj.betaArray);
+            xlabel('N');
+            ylabel('Beta');
+            hold off
+        end
+        
+        function plotFriction(obj)
+            % Построение силы трения
+
+            arguments
+                obj (:,1) {mustBeNonempty}
+            end
+            figure('Name', 'График силы трения', 'Position', [100, 100, 400, 400]);
+            hold on
+            xLine = 1:1:length(obj.frArray);
+            plot(xLine,obj.frArray);
+            xlabel('N');
+            ylabel('Friction');
+            hold off
         end
 
         function plotTrajectory(obj)
@@ -126,16 +150,15 @@ classdef ZakovikaClass < handle
             figure('Name', 'Траектория падения спутника', 'Position', [150, 150, 800, 800]);
             
             % Преобразование в декартовы координаты
-            x = obj.radiusArray .* cos(obj.fiArray) / 1000; % в км
-            y = obj.radiusArray .* sin(obj.fiArray) / 1000; % в км
+            x = obj.radiusArray.* cos(obj.fiArray) / 1000; % в км
+            y = obj.radiusArray.* sin(obj.fiArray) / 1000; % в км
             
-            hold on
+            hold on;
             %Рисование Земли
             viscircles([0,0],obj.earthR/1000);
             
             % Построение траектории
             plot(x, y, 'b-', 'LineWidth', 2, 'DisplayName', 'Траектория спутника');
-            hold on;
             
             % Маркировка начальной и конечной точек
             plot(x(1), y(1), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g', 'DisplayName', 'Начало');
@@ -154,7 +177,7 @@ classdef ZakovikaClass < handle
             % Установка пределов осей для лучшей видимости
             maxRadius = max(obj.radiusArray) / 1000;
             axis([-maxRadius*1.1, maxRadius*1.1, -maxRadius*1.1, maxRadius*1.1]);
-            hold off
+            hold off;
         end
 
         function result = v1Space(obj,h)
@@ -173,37 +196,62 @@ classdef ZakovikaClass < handle
           result = obj.ro0 * exp(-h/obj.H);
           end
           
-        function result = frictionForce(obj,h)
+        function result = frictionForce(obj,height,velocity)
             arguments
                 obj (:, 1) {mustBeNonempty}
-                h  (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
+                height  (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
+                velocity  (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
             end
-          result = obj.cx * obj.midelS * obj.ro(h) * obj.v1Space(h)^2 / 2;
+          result = obj.cx * obj.midelS * obj.ro(height) * velocity^2 / 2;
+        end
+
+        function result = iterate(obj, tau, tEnd)
+            arguments
+                obj (:, 1) {mustBeNonempty}
+                tau (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
+                tEnd (:, 1) {mustBeNonempty, mustBeNumeric, mustBeFinite}
+            end
+            obj.tau = tau;
+            while(obj.t < tEnd)
+                hh = obj.numStep();
+                obj.t = obj.t + obj.tau;
+                if hh<=0
+                   obj.radiusArray=obj.radiusArray(1:end-1);
+                   obj.fiArray=obj.fiArray(1:end-1);
+                   obj.velocityArray=obj.velocityArray(1:end-1);
+                   obj.betaArray=obj.betaArray(1:end-1);
+                   obj.frArray=obj.frArray(1:end-1);
+                   break;
+                end
+            end
+            result = hh;
         end
 
         function result = numStep(obj)
             arguments
                 obj (:, 1) {mustBeNonempty}
             end
-          radiusDerivativeNew = obj.radiusDerivative + obj.tau * ((obj.radius*obj.fiDerivative^2) - obj.constG*obj.earthM/obj.radius^2 + obj.frictionForce(obj.h)*sin(obj.beta)/obj.m);
-          fiDerivativeNew = obj.fiDerivative + obj.tau / obj.radius * (obj.frictionForce(obj.h)*cos(obj.beta)/obj.m - 2*obj.fiDerivative*obj.radiusDerivative);
+          F_fr = obj.frictionForce(obj.h, obj.velocity);
+          radiusDerivativeNew = obj.radiusDerivative + obj.tau * (obj.radius*obj.fiDerivative^2 - obj.constG*obj.earthM/obj.radius^2 + F_fr*sin(obj.beta)/obj.m);
+          fiDerivativeNew = obj.fiDerivative + obj.tau / obj.radius * (-2*obj.radiusDerivative*obj.fiDerivative - F_fr*cos(obj.beta)/obj.m);
           radiusNew = obj.radius + obj.tau * radiusDerivativeNew;
           fiNew = obj.fi + obj.tau * fiDerivativeNew;
           hNew = radiusNew-obj.earthR;
-          betanew = atan2(radiusNew-obj.radius, obj.tau*fiDerivativeNew*obj.radius);
         
+          obj.beta = atan2(radiusNew-obj.radius, obj.tau*obj.velocity);
+
           obj.h = hNew;
           obj.radius = radiusNew;
           obj.radiusDerivative = radiusDerivativeNew;
           obj.fi = fiNew;
           obj.fiDerivative = fiDerivativeNew;
-          velocity = obj.fiDerivative * obj.earthR;
-          obj.beta = betanew;
+          obj.velocity = sqrt(obj.radiusDerivative^2+(obj.fiDerivative*obj.radius)^2);
         
           obj.radiusArray = [obj.radiusArray obj.radius];
           obj.fiArray = [obj.fiArray (obj.fi)];
-          obj.velocityArray = [obj.velocityArray velocity];
-          obj.t = obj.t + obj.tau;
+          obj.velocityArray = [obj.velocityArray obj.velocity];
+          obj.betaArray = [obj.betaArray obj.beta*180/pi];
+          obj.frArray = [obj.frArray F_fr];
           result = obj.h;
         end
     end
